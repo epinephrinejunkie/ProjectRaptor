@@ -883,7 +883,7 @@ class Amazon:
             timeout = self.get_timeout(5)
             while self.driver.title == "" and time.time() < timeout:
                 time.sleep(0.5)
-            if self.driver.title != "Place Your Order - AmazonSmile Checkout":
+            if self.driver.title not in amazon_config["CHECKOUT_TITLES"]:
                 retry += 1
                 if retry > max_atc_retries:
                     return False
@@ -2004,7 +2004,7 @@ class AmazonItemCondition(Enum):
 
 
 def get_item_condition(form_action) -> AmazonItemCondition:
-    """ Attempts to determine the Item Condition from the Add To Cart form action """
+    """Attempts to determine the Item Condition from the Add To Cart form action"""
     if "_new_" in form_action:
         # log.debug(f"Item condition is new")
         return AmazonItemCondition.New
