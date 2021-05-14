@@ -120,6 +120,7 @@ class AmazonMonitoringHandler(BaseStoreHandler):
         self,
         notification_handler: NotificationHandler,
         item_list: List[FGItem],
+        delay: float,
         amazon_config,
         tasks=1,
         checkshipping=False,
@@ -152,6 +153,7 @@ class AmazonMonitoringHandler(BaseStoreHandler):
                     item=item_list[idx],
                     amazon_config=self.amazon_config,
                     connector=connector,
+                    delay=delay,
                 )
             )
             self.sessions_list[idx].headers.update({"user-agent": ua.random})
@@ -174,6 +176,7 @@ class AmazonMonitor(aiohttp.ClientSession):
         self,
         item: FGItem,
         amazon_config: Dict,
+        delay: float,
         *args,
         **kwargs,
     ):
@@ -182,7 +185,7 @@ class AmazonMonitor(aiohttp.ClientSession):
         self.amazon_config = amazon_config
         self.domain = urlparse(self.item.furl.url).netloc
 
-        self.delay: float = 5
+        self.delay = delay
         if item.purchase_delay > 0:
             self.delay = 20
         self.block_purchase_until = time.time() + item.purchase_delay
@@ -201,10 +204,11 @@ class AmazonMonitor(aiohttp.ClientSession):
         # Something wrong, start a new task then kill this one
         log.debug("Max consecutive request fails reached. Restarting session")
         session = AmazonMonitor(
-            headers=HEADERS,
             item=self.item,
             amazon_config=self.amazon_config,
+            delay=self.delay,
             connector=self.connector,
+            headers=HEADERS,
         )
         session.headers.update({"user-agent": UserAgent().random})
         log.debug("Sesssion Created")
@@ -299,7 +303,7 @@ class AmazonMonitor(aiohttp.ClientSession):
             async with self.get(url) as resp:
                 status = resp.status
                 text = await resp.text()
-        except aiohttp.ClientError as e:
+        except (aiohttp.ClientError, OSError) as e:
             log.debug(e)
             status = 999
         return status, text
@@ -359,7 +363,7 @@ async def wait_timer(end_time):
 def get_item_sellers(
     tree: html.HtmlElement, item: FGItem, free_shipping_strings, atc_method=False
 ):
-    """Parse out information to from the aod-offer nodes populate ItemDetail instances for each item """
+    """Parse out information to from the aod-offer nodes populate ItemDetail instances for each item"""
     sellers: Optional[List[SellerDetail]] = []
     if tree is None:
         return sellers
@@ -368,7 +372,7 @@ def get_item_sellers(
     found_asin = "[NO ASIN FOUND ON PAGE]"
     # First see if ASIN can be found with xpath
     # look for product ASIN
-    page_asin = tree.xpath("//input[@id='ftSelectAsin']")
+    page_asin = tree.xpath("//input[@id='ftSelectAsin' or @id='ddmSelectAsin']")
     if page_asin:
         try:
             found_asin = page_asin[0].value.strip()
