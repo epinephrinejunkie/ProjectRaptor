@@ -1,0 +1,1 @@
+cmd /k pipenv run python app.py amazon-aio --checkshipping --shipping-bypass --single-shot --delay 1 --p 1234 --no-screenshots --headless
